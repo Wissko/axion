@@ -28,7 +28,7 @@ interface FlavorData {
   imagePosition: 'left' | 'right';
 }
 
-// ─── Données produits ─────────────────────────────────────────────────────────
+// ─── Product data ─────────────────────────────────────────────────────────────
 const FLAVORS: FlavorData[] = [
   {
     id: 0,
@@ -36,13 +36,13 @@ const FLAVORS: FlavorData[] = [
     accent: '#3B82F6',
     frameDir: '/images/Frames_blue',
     headline: 'RAZOR SHARP FOCUS',
-    accroche: 'Chaque rep compte. Chaque seconde aussi.',
+    accroche: 'Every rep counts. Every second matters.',
     benefits: [
-      'Concentration laser des les premieres minutes',
-      'Energie explosive sans crash post-entrainement',
-      'Endurance mentale et physique prolongee',
-      'Cafeine naturelle + L-Theanine',
-      'Saveur Blue Razz glacee — sans sucre ajoute',
+      'Laser focus from the very first minutes',
+      'Explosive energy with no post-workout crash',
+      'Extended mental and physical endurance',
+      'Natural caffeine + L-Theanine',
+      'Icy Blue Razz flavor — no added sugar',
     ],
     imagePosition: 'left',
   },
@@ -52,13 +52,13 @@ const FLAVORS: FlavorData[] = [
     accent: '#F0A830',
     frameDir: '/images/Frames_orange',
     headline: 'TROPICAL SURGE',
-    accroche: "L'energie du soleil, la puissance du terrain.",
+    accroche: 'The energy of the sun, the power of the field.',
     benefits: [
-      'Boost cardio intense pour les seances longues',
-      "Beta-Alanine pour repousser l'acide lactique",
-      'Vitamine B6 + B12 pour le metabolisme energetique',
-      'Hydratation optimisee avec electrolytes naturels',
-      'Saveur Mango tropicale — zero compromis',
+      'Intense cardio boost for long sessions',
+      'Beta-Alanine to push back lactic acid',
+      'Vitamin B6 + B12 for energy metabolism',
+      'Optimized hydration with natural electrolytes',
+      'Tropical Mango flavor — zero compromise',
     ],
     imagePosition: 'right',
   },
@@ -68,13 +68,13 @@ const FLAVORS: FlavorData[] = [
     accent: '#8B5CF6',
     frameDir: '/images/Frames_purple',
     headline: 'DARK GRAPE FOCUS',
-    accroche: 'La nuit appartient a ceux qui preparent leur victoire.',
+    accroche: 'The night belongs to those who prepare their victory.',
     benefits: [
-      'Pump musculaire puissant — Citrulline Malate',
-      'Antioxydants naturels pour la recuperation',
-      'Focus nocturne sans perturber le sommeil',
+      'Powerful muscle pump — Citrulline Malate',
+      'Natural antioxidants for recovery',
+      'Nighttime focus without disrupting sleep',
       'Tyrosine + Alpha GPC',
-      'Saveur Grape intense — profonde, pas sucree',
+      'Intense Grape flavor — deep, not sweet',
     ],
     imagePosition: 'left',
   },
@@ -143,11 +143,32 @@ const imageBlockVariants = {
   },
 };
 
+// ─── Particle canvas ─────────────────────────────────────────────────────────
+interface Particle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  radius: number;
+  opacity: number;
+}
+
+function hexToRgb(hex: string): [number, number, number] {
+  return [
+    parseInt(hex.slice(1, 3), 16),
+    parseInt(hex.slice(3, 5), 16),
+    parseInt(hex.slice(5, 7), 16),
+  ];
+}
+
 // ─── Composant principal ──────────────────────────────────────────────────────
 // Named export for page.tsx compatibility
 export function ScrollSequence() {
   const sectionRef = useRef<HTMLElement>(null);
   const kineticRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const scrollVelocityRef = useRef(0);
+  const flavorAccentRef = useRef(FLAVORS[0].accent);
 
   // Frame & flavor state
   const [frameIndex, setFrameIndex] = useState(0);
@@ -287,6 +308,9 @@ export function ScrollSequence() {
           2
         );
 
+        // Feed scroll velocity to particle system
+        scrollVelocityRef.current = self.getVelocity();
+
         setFrameIndex(newFrameIndex);
         updateFrame(newFrameIndex);
 
@@ -309,6 +333,78 @@ export function ScrollSequence() {
       if (crossfadeTimeoutRef.current) {
         clearTimeout(crossfadeTimeoutRef.current);
       }
+    };
+  }, []);
+
+  // ─── Sync accent ref on flavor change ─────────────────────────────────────
+  useEffect(() => {
+    flavorAccentRef.current = FLAVORS[flavorIndex].accent;
+  }, [flavorIndex]);
+
+  // ─── Particle canvas RAF ──────────────────────────────────────────────────
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const PARTICLE_COUNT = 80;
+    const particles: Particle[] = [];
+
+    const resize = () => {
+      canvas.width = canvas.offsetWidth;
+      canvas.height = canvas.offsetHeight;
+    };
+    resize();
+    window.addEventListener('resize', resize);
+
+    // Seed particles randomly
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+      particles.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        vx: (Math.random() - 0.5) * 0.3,
+        vy: Math.random() * 0.2 + 0.05,
+        radius: Math.random() * 1.2 + 0.4,
+        opacity: Math.random() * 0.04 + 0.02,
+      });
+    }
+
+    let rafId: number;
+
+    const draw = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const [r, g, b] = hexToRgb(flavorAccentRef.current);
+      const velocity = Math.abs(scrollVelocityRef.current);
+      // velocity from ScrollTrigger is 0–~3000; normalise to 0–1
+      const boost = Math.min(velocity / 800, 1);
+
+      for (const p of particles) {
+        // Drift faster when scrolling
+        p.y += p.vy * (1 + boost * 6);
+        p.x += p.vx;
+
+        // Wrap around
+        if (p.y > canvas.height + 2) p.y = -2;
+        if (p.x < -2) p.x = canvas.width + 2;
+        if (p.x > canvas.width + 2) p.x = -2;
+
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(${r},${g},${b},${p.opacity})`;
+        ctx.fill();
+      }
+
+      rafId = requestAnimationFrame(draw);
+    };
+
+    draw();
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      window.removeEventListener('resize', resize);
     };
   }, []);
 
@@ -354,7 +450,7 @@ export function ScrollSequence() {
           height: '500vh',
           position: 'relative',
         }}
-        aria-label="Présentation des saveurs Axion"
+        aria-label="Axion flavor showcase"
       >
         {/* Inner sticky container */}
         <div
@@ -366,6 +462,19 @@ export function ScrollSequence() {
             background: '#000',
           }}
         >
+          {/* ── Particle canvas background ──────────────────────────────── */}
+          <canvas
+            ref={canvasRef}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              zIndex: 0,
+              pointerEvents: 'none',
+            }}
+          />
+
           {/* ── Kinetic typography (fond) ────────────────────────────────── */}
           <div
             style={{
@@ -570,7 +679,7 @@ export function ScrollSequence() {
               alignItems: 'center',
               gap: '0.6rem',
             }}
-            aria-label={`Produit ${flavorIndex + 1} sur 3`}
+            aria-label={`Product ${flavorIndex + 1} of 3`}
           >
             {/* Pastilles */}
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
