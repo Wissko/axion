@@ -1,0 +1,62 @@
+/* Global styles — AXION Electric Pre */
+
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&display=swap");
+
+@font-face {
+  font-family: "PP Neue Corp Wide";
+  src: url("https://cdn.prod.website-files.com/671752cd4027f01b1b8f1c7f/6717e399d30a606fed425914_PPNeueCorp-WideUltrabold.woff2")
+    format("woff2");
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #0a0804;
+  --accent-electric: #f0a830;
+  --accent-blue: #3b82f6;
+  --accent-purple: #8b5cf6;
+  --text: #f5f0e6;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: auto; /* Lenis handles smoothing */
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: "DM Sans", sans-serif;
+  font-weight: 300;
+  overflow-x: hidden;
+}
+
+/* Electric particle glow utility */
+.glow-electric {
+  filter: drop-shadow(0 0 12px var(--accent-electric));
+}
+
+/* Lightning bolt pseudo-element used in hero layers */
+.layer-lightning::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse at 50% 40%,
+    rgba(240, 168, 48, 0.08) 0%,
+    transparent 70%
+  );
+  pointer-events: none;
+}
