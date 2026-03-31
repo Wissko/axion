@@ -1,27 +1,45 @@
 /**
- * ScrollSequence
- * Sticky canvas section that plays 90 frames across 3 product flavors
- * as the user scrolls through a 300vh pinned container.
+ * ScrollSequence — AXION Arc Cinématique
  *
- * Frame layout:
- *   frames  1-30  → Frames_blue  (Blue Razz)
- *   frames 31-60  → Frames_orange (Mango)
- *   frames 61-90  → Frames_purple (Grape)
+ * Les 90 frames (3 produits × 30) défilent le long d'un arc de cercle
+ * au scroll : entrée par la droite, sommet au centre, sortie par la gauche.
+ * 6-7 vignettes sont visibles simultanément sur l'arc.
  *
- * Each frame image lives at /images/Frames_blue/frame-{n}.png etc.
- * At the start of each product block, an overlay fades in the product name.
+ * Layout général :
+ *   - Fond #000000
+ *   - Section sticky height: 400vh
+ *   - Vignettes fixes (280×400 desktop, 140×200 mobile)
+ *   - Arc paramétrique : x = cx + R·cos(θ), y = cy + R·sin(θ)
+ *   - mix-blend-mode: screen → zones sombres transparentes
+ *   - Texte produit animé (Framer Motion AnimatePresence) à gauche
  */
 
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import gsap from "gsap";
 import ScrollTrigger from "gsap/ScrollTrigger";
 
+// Register GSAP plugin
 gsap.registerPlugin(ScrollTrigger);
 
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
 const FRAMES_PER_FLAVOR = 30;
-const TOTAL_FRAMES = 90; // 3 flavors x 30
+const TOTAL_FRAMES = 90; // 3 × 30
+
+/** Maximum slots allocated in DOM — enough for desktop (7) + buffer */
+const MAX_SLOTS = 7;
+
+/** Angular separation between adjacent frame slots (degrees) */
+const ANGLE_STEP_DEG = 24;
+
+// ---------------------------------------------------------------------------
+// Product / flavor data
+// ---------------------------------------------------------------------------
 
 interface Flavor {
   folder: string;
@@ -51,7 +69,11 @@ const FLAVORS: Flavor[] = [
   },
 ];
 
-/** Build the full ordered array of image paths (1-indexed frame names) */
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Build the full ordered list of frame image paths (1-indexed filenames) */
 function buildFramePaths(): string[] {
   const paths: string[] = [];
   for (const flavor of FLAVORS) {
@@ -62,180 +84,370 @@ function buildFramePaths(): string[] {
   return paths;
 }
 
-/** Pre-load all frames into HTMLImageElement cache */
-function preloadFrames(paths: string[]): Promise<HTMLImageElement[]> {
+/** Preload all frames into the browser cache. Calls onProgress after each load. */
+function preloadAll(
+  paths: string[],
+  onProgress: (loaded: number) => void
+): Promise<void> {
+  let loaded = 0;
   return Promise.all(
     paths.map(
       (src) =>
-        new Promise<HTMLImageElement>((resolve) => {
-          const img = new Image();
-          img.onload = () => resolve(img);
-          img.onerror = () => resolve(img); // continue even if a frame is missing
+        new Promise<void>((resolve) => {
+          const img = new window.Image();
+          const done = () => {
+            loaded += 1;
+            onProgress(loaded);
+            resolve();
+          };
+          img.onload = done;
+          img.onerror = done; // continue even if a frame is missing
           img.src = src;
         })
     )
-  );
+  ).then(() => undefined);
 }
 
-export function ScrollSequence() {
-  const wrapperRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const overlayRef = useRef<HTMLDivElement>(null);
+// ---------------------------------------------------------------------------
+// Responsive configuration (re-computed on resize)
+// ---------------------------------------------------------------------------
 
-  // Tracks which flavor overlay is currently visible
+interface ArcConfig {
+  frameW: number;
+  frameH: number;
+  /** Arc radius in px */
+  R: number;
+  /** Horizontal center of arc in px */
+  cx: number;
+  /** Vertical center-anchor of arc in px (arc curves upward from here) */
+  cy: number;
+  /** Number of frames visible on each side of active frame */
+  visibleRadius: number;
+  /** Total visible slots = visibleRadius * 2 + 1 */
+  visibleCount: number;
+}
+
+function getArcConfig(): ArcConfig {
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const mobile = vw < 768;
+  return {
+    frameW: mobile ? 140 : 280,
+    frameH: mobile ? 200 : 400,
+    R: mobile ? vw * 0.9 : vw * 0.6,
+    cx: vw / 2,
+    cy: vh * 0.8,
+    visibleRadius: mobile ? 2 : 3,
+    visibleCount: mobile ? 5 : 7,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
+export function ScrollSequence() {
+  /** Outer scroll wrapper — 400vh */
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  /** DOM refs for each arc frame slot */
+  const slotRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const imgRefs = useRef<(HTMLImageElement | null)[]>([]);
+
+  /** Loading progress (0 → TOTAL_FRAMES) */
+  const [loadProgress, setLoadProgress] = useState(0);
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  /** Active flavor for product text */
   const [activeFlavor, setActiveFlavor] = useState<Flavor>(FLAVORS[0]);
-  const [overlayVisible, setOverlayVisible] = useState(false);
+  /** Key increment triggers AnimatePresence re-mount on flavor change */
+  const [flavorKey, setFlavorKey] = useState(0);
+
+  /** Tracks last flavor index to avoid redundant setState calls */
+  const prevFlavorIdxRef = useRef<number>(0);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    const wrapper = wrapperRef.current;
-    if (!canvas || !wrapper) return;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
     const paths = buildFramePaths();
-    let images: HTMLImageElement[] = [];
-    let currentFrame = 0;
 
-    // Resize canvas to fill viewport
-    function resizeCanvas() {
-      if (!canvas) return;
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-    }
-    resizeCanvas();
-    window.addEventListener("resize", resizeCanvas);
+    // -----------------------------------------------------------------------
+    // Phase 1 — Preload all frames
+    // -----------------------------------------------------------------------
+    preloadAll(paths, (n) => setLoadProgress(n)).then(() => {
+      setIsLoaded(true);
 
-    /** Draw the frame at index `n` onto the canvas */
-    function drawFrame(n: number) {
-      if (!canvas || !ctx) return;
-      const img = images[n];
-      if (!img || !img.complete || !img.naturalWidth) return;
+      const wrapper = wrapperRef.current;
+      if (!wrapper) return;
 
-      // Cover-fit: center-crop the image to fill the canvas
-      const scale = Math.max(
-        canvas.width / img.naturalWidth,
-        canvas.height / img.naturalHeight
-      );
-      const dw = img.naturalWidth * scale;
-      const dh = img.naturalHeight * scale;
-      const dx = (canvas.width - dw) / 2;
-      const dy = (canvas.height - dh) / 2;
+      // Responsive config (mutable, refreshed on resize)
+      let cfg = getArcConfig();
+      const onResize = () => {
+        cfg = getArcConfig();
+      };
+      window.addEventListener("resize", onResize);
 
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, dx, dy, dw, dh);
-    }
+      // -------------------------------------------------------------------
+      // Core arc update — called on every ScrollTrigger tick
+      // -------------------------------------------------------------------
+      const updateArc = (progress: number) => {
+        // rawIndex: continuous float 0 → 89
+        const rawIndex = progress * (TOTAL_FRAMES - 1);
 
-    /** Update overlay when entering a new flavor block */
-    function updateOverlay(frameIndex: number) {
-      const flavorIndex = Math.floor(frameIndex / FRAMES_PER_FLAVOR);
-      const clamped = Math.min(flavorIndex, FLAVORS.length - 1);
-      const flavor = FLAVORS[clamped];
+        // Center frame index (integer, nearest frame)
+        const centerIdx = Math.round(rawIndex);
+        // Fractional offset: how far rawIndex is from centerIdx (-0.5 to +0.5)
+        const frac = rawIndex - centerIdx;
 
-      // Determine if we are near the start of a flavor block (first 5 frames)
-      const localFrame = frameIndex % FRAMES_PER_FLAVOR;
-      const visible = localFrame < 5;
+        const { frameW, frameH, R, cx, cy, visibleRadius, visibleCount } = cfg;
 
-      setActiveFlavor(flavor);
-      setOverlayVisible(visible);
-    }
+        // -- Update product text --
+        // Use clamped floor so the last frame doesn't overflow FLAVORS array
+        const flavorIdx = Math.min(
+          Math.floor(centerIdx / FRAMES_PER_FLAVOR),
+          FLAVORS.length - 1
+        );
+        if (flavorIdx !== prevFlavorIdxRef.current) {
+          prevFlavorIdxRef.current = flavorIdx;
+          setActiveFlavor(FLAVORS[flavorIdx]);
+          setFlavorKey(flavorIdx);
+        }
 
-    // Load images, then wire ScrollTrigger
-    preloadFrames(paths).then((loaded) => {
-      images = loaded;
-      drawFrame(0);
+        // -- Update each DOM slot --
+        for (let i = 0; i < MAX_SLOTS; i++) {
+          const slot = slotRefs.current[i];
+          const img = imgRefs.current[i];
+          if (!slot || !img) continue;
 
+          // Hide slots beyond current visibleCount (mobile uses fewer)
+          if (i >= visibleCount) {
+            slot.style.opacity = "0";
+            continue;
+          }
+
+          // Frame index this slot should display
+          // slots 0..visibleCount-1 map to centerIdx-visR .. centerIdx+visR
+          const frameIdx = centerIdx - visibleRadius + i;
+
+          // Hide out-of-range frames (beginning / end of sequence)
+          if (frameIdx < 0 || frameIdx >= TOTAL_FRAMES) {
+            slot.style.opacity = "0";
+            continue;
+          }
+
+          // Update image src (instant — image is preloaded)
+          const newSrc = paths[frameIdx];
+          if (img.src !== newSrc && !img.src.endsWith(newSrc)) {
+            img.src = newSrc;
+          }
+
+          // Fractional offset of this slot from the continuous rawIndex
+          // offset = 0 → sommet de l'arc; offset > 0 → droite; offset < 0 → gauche
+          const offset = i - visibleRadius - frac;
+
+          // Arc position (degrees → radians)
+          // -90° = sommet de l'arc (haut), frames entrent par la droite (+offset)
+          const angleDeg = -90 + offset * ANGLE_STEP_DEG;
+          const angleRad = (angleDeg * Math.PI) / 180;
+          const x = cx + R * Math.cos(angleRad);
+          const y = cy + R * Math.sin(angleRad);
+
+          // Scale & opacity: 1.2 at center → 0.7 at far edge
+          const absOffset = Math.abs(offset);
+          const normalized = Math.min(absOffset / visibleRadius, 1);
+          const scale = 1.2 - normalized * 0.5; // 1.2 → 0.7
+          const opacity = Math.max(0, 1 - normalized * 0.7); // 1.0 → 0.3
+
+          // Z-index: active frame on top
+          const zIndex = Math.round(20 - absOffset * 3);
+
+          // Apply transforms directly (bypass React render cycle for perf)
+          slot.style.width = `${frameW}px`;
+          slot.style.height = `${frameH}px`;
+          slot.style.transform = `translate(${x - frameW / 2}px, ${
+            y - frameH / 2
+          }px) scale(${scale.toFixed(4)})`;
+          slot.style.opacity = opacity.toFixed(4);
+          slot.style.zIndex = String(zIndex);
+        }
+      };
+
+      // Initial render at progress = 0
+      updateArc(0);
+
+      // -------------------------------------------------------------------
+      // ScrollTrigger wiring
+      // -------------------------------------------------------------------
       const st = ScrollTrigger.create({
         trigger: wrapper,
         start: "top top",
         end: "bottom bottom",
-        scrub: 0.5,
-        onUpdate: (self) => {
-          const rawIndex = Math.round(self.progress * (TOTAL_FRAMES - 1));
-          const frameIndex = Math.max(0, Math.min(rawIndex, TOTAL_FRAMES - 1));
-
-          if (frameIndex !== currentFrame) {
-            currentFrame = frameIndex;
-            drawFrame(frameIndex);
-            updateOverlay(frameIndex);
-          }
-        },
+        scrub: 1,
+        onUpdate: (self) => updateArc(self.progress),
       });
 
-      return () => st.kill();
+      // Cleanup
+      return () => {
+        st.kill();
+        window.removeEventListener("resize", onResize);
+      };
     });
-
-    return () => {
-      window.removeEventListener("resize", resizeCanvas);
-    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
   return (
-    // 300vh scroll container — canvas sticks to viewport
+    /* 400vh scroll container — canvas sticks to viewport */
     <div
       ref={wrapperRef}
       className="relative"
-      style={{ height: "300vh", backgroundColor: "#0A0804" }}
+      style={{ height: "400vh", backgroundColor: "#000000" }}
     >
-      {/* Sticky canvas */}
-      <div className="sticky top-0 h-screen w-full overflow-hidden">
-        <canvas
-          ref={canvasRef}
-          className="absolute inset-0 w-full h-full"
-          style={{ display: "block" }}
-        />
+      {/* Sticky viewport — fills screen height */}
+      <div
+        className="sticky top-0 w-full overflow-hidden"
+        style={{ height: "100vh", backgroundColor: "#000000" }}
+      >
 
-        {/* Product overlay — always in DOM, toggled via opacity */}
+        {/* ----------------------------------------------------------------
+            Arc frame slots — absolutely positioned, updated via direct DOM
+        ----------------------------------------------------------------- */}
         <div
-          ref={overlayRef}
-          className="absolute inset-0 flex flex-col items-center justify-end pb-24 z-10 pointer-events-none transition-opacity duration-500"
-          style={{ opacity: overlayVisible ? 1 : 0 }}
+          className="absolute inset-0"
+          aria-hidden="true"
+          style={{ pointerEvents: "none" }}
         >
-          <p
-            className="uppercase tracking-widest mb-3"
-            style={{
-              fontFamily: "DM Sans, sans-serif",
-              fontWeight: 300,
-              fontSize: "clamp(0.7rem, 1vw, 0.95rem)",
-              letterSpacing: "0.35em",
-              color: activeFlavor.accent,
-            }}
-          >
-            AXION Electric Pre
-          </p>
-          <h2
-            className="uppercase text-center leading-none"
-            style={{
-              fontFamily: "PP Neue Corp Wide, sans-serif",
-              fontWeight: 800,
-              fontSize: "clamp(2.5rem, 7vw, 8rem)",
-              color: "#F5F0E6",
-              textShadow: `0 0 60px ${activeFlavor.accent}80`,
-            }}
-          >
-            {activeFlavor.name}
-          </h2>
-          <p
-            className="mt-4 uppercase tracking-widest"
-            style={{
-              fontFamily: "DM Sans, sans-serif",
-              fontWeight: 300,
-              fontSize: "clamp(0.75rem, 1.1vw, 1rem)",
-              letterSpacing: "0.3em",
-              color: "rgba(245,240,230,0.5)",
-            }}
-          >
-            {activeFlavor.subtitle}
-          </p>
+          {Array.from({ length: MAX_SLOTS }, (_, i) => (
+            <div
+              key={i}
+              ref={(el) => {
+                slotRefs.current[i] = el;
+              }}
+              className="absolute"
+              style={{
+                /* Initial size; overridden per-tick for responsive */
+                width: "280px",
+                height: "400px",
+                willChange: "transform, opacity",
+                transformOrigin: "center center",
+                opacity: 0,
+              }}
+            >
+              {/* Frame image — mix-blend-mode: screen removes dark background */}
+              <img
+                ref={(el) => {
+                  imgRefs.current[i] = el;
+                }}
+                alt=""
+                draggable={false}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  mixBlendMode: "screen",
+                  display: "block",
+                  userSelect: "none",
+                }}
+              />
+            </div>
+          ))}
         </div>
 
-        {/* Bottom fade */}
+        {/* ----------------------------------------------------------------
+            Product text — left side, animated on flavor change
+        ----------------------------------------------------------------- */}
         <div
-          className="absolute bottom-0 left-0 right-0 pointer-events-none z-20"
+          className="absolute z-20"
           style={{
-            height: "20%",
-            background: "linear-gradient(to bottom, transparent, #0A0804)",
+            left: "clamp(1.5rem, 4vw, 5rem)",
+            top: "50%",
+            transform: "translateY(-50%)",
+            maxWidth: "32vw",
+            pointerEvents: "none",
+          }}
+        >
+          {/*
+            Stable anchor div always in DOM (satisfies layoutId rule).
+            AnimatePresence handles enter/exit transitions inside.
+          */}
+          <div>
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={flavorKey}
+                initial={{ opacity: 0, x: -30 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -30 }}
+                transition={{
+                  duration: 0.6,
+                  ease: [0.25, 0.46, 0.45, 0.94] as [
+                    number,
+                    number,
+                    number,
+                    number
+                  ],
+                }}
+              >
+                {/* Subtitle — DM Sans 300, accent color */}
+                <p
+                  style={{
+                    fontFamily: "DM Sans, sans-serif",
+                    fontWeight: 300,
+                    fontSize: "1.2rem",
+                    color: activeFlavor.accent,
+                    marginBottom: "1rem",
+                    letterSpacing: "0.1em",
+                  }}
+                >
+                  {activeFlavor.subtitle}
+                </p>
+
+                {/* Product name — PP Neue Corp Wide 800, ~8vw */}
+                <h2
+                  style={{
+                    fontFamily: "'PP Neue Corp Wide', sans-serif",
+                    fontWeight: 800,
+                    fontSize: "clamp(2.5rem, 8vw, 9rem)",
+                    color: "#FFFFFF",
+                    lineHeight: 1,
+                    textTransform: "uppercase",
+                    margin: 0,
+                  }}
+                >
+                  {activeFlavor.name}
+                </h2>
+              </motion.div>
+            </AnimatePresence>
+          </div>
+        </div>
+
+        {/* ----------------------------------------------------------------
+            Preload progress bar — thin line at bottom, accent-colored
+        ----------------------------------------------------------------- */}
+        {!isLoaded && (
+          <div
+            className="absolute bottom-0 left-0 right-0 z-50"
+            style={{ height: "2px", backgroundColor: "#111111" }}
+          >
+            <div
+              style={{
+                height: "100%",
+                width: `${(loadProgress / TOTAL_FRAMES) * 100}%`,
+                backgroundColor: FLAVORS[0].accent,
+                transition: "width 0.08s linear",
+              }}
+            />
+          </div>
+        )}
+
+        {/* ----------------------------------------------------------------
+            Bottom vignette — soften the lower edge into pure black
+        ----------------------------------------------------------------- */}
+        <div
+          aria-hidden="true"
+          className="absolute bottom-0 left-0 right-0 pointer-events-none z-10"
+          style={{
+            height: "18%",
+            background: "linear-gradient(to bottom, transparent, #000000)",
           }}
         />
       </div>
