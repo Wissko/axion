@@ -12,6 +12,17 @@
  *   - Arc paramétrique : x = cx + R·cos(θ), y = cy + R·sin(θ)
  *   - mix-blend-mode: screen → zones sombres transparentes
  *   - Texte produit animé (Framer Motion AnimatePresence) à gauche
+ *
+ * Kinetic typography :
+ *   - Quand le produit change, le nom du produit ENTRANT s'affiche en très grand
+ *     (30vw, uppercase, PP Neue Corp Wide) et glisse horizontalement hors-écran
+ *     via GSAP fromTo x: '0%' → '-120%', ease: power3.inOut, 0.7s
+ *   - Le div kinétique est en absolute, overflow:hidden, pointer-events:none,
+ *     z-index:0, opacity:0.08 — watermark en mouvement
+ *
+ * Parallax texte :
+ *   - Pendant le scroll au sein d'un produit, le bloc texte dérive doucement
+ *     vers le haut via GSAP quickSetter : y 0 → -20px sur productProgress 0→1
  */
 
 "use client";
@@ -154,6 +165,48 @@ export function ScrollSequence() {
   const slotRefs = useRef<(HTMLDivElement | null)[]>([]);
   const imgRefs = useRef<(HTMLImageElement | null)[]>([]);
 
+  // ---------------------------------------------------------------------------
+  // Kinetic typography refs
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Wrapper div for the kinetic text block.
+   * GSAP animates `x` on this element: '0%' → '-120%'.
+   * Initialized off-screen (x: '-120%') so it's hidden until first transition.
+   */
+  const kineticWrapperRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * The <span> inside the kinetic wrapper — textContent is updated
+   * synchronously (via DOM ref) to the INCOMING product name before GSAP fires.
+   */
+  const kineticSpanRef = useRef<HTMLSpanElement>(null);
+
+  /** Active GSAP tween for kinetic animation — killed on every new transition */
+  const kineticTweenRef = useRef<gsap.core.Tween | null>(null);
+
+  // ---------------------------------------------------------------------------
+  // Parallax text refs
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Outer wrapper for the product text block.
+   * GSAP quickSetter updates `y` on this element per scroll tick.
+   * Framer Motion's AnimatePresence lives INSIDE this wrapper to avoid
+   * transform conflicts.
+   */
+  const parallaxTextRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * GSAP quickSetter for parallax y — created once after mount.
+   * Stored in a ref to avoid re-creation and ensure closure stability.
+   */
+  const parallaxSetterRef = useRef<((value: number) => void) | null>(null);
+
+  // ---------------------------------------------------------------------------
+  // State
+  // ---------------------------------------------------------------------------
+
   /** Loading progress (0 → TOTAL_FRAMES) */
   const [loadProgress, setLoadProgress] = useState(0);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -178,6 +231,24 @@ export function ScrollSequence() {
       const wrapper = wrapperRef.current;
       if (!wrapper) return;
 
+      // ---------------------------------------------------------------------
+      // Phase 2 — Initialize kinetic text off-screen + parallax quickSetter
+      // ---------------------------------------------------------------------
+
+      // Position kinetic wrapper off-screen left so it's invisible at start
+      if (kineticWrapperRef.current) {
+        gsap.set(kineticWrapperRef.current, { x: "-120%" });
+      }
+
+      // Create parallax quickSetter once (perf: avoids GSAP lookup per frame)
+      if (parallaxTextRef.current) {
+        parallaxSetterRef.current = gsap.quickSetter(
+          parallaxTextRef.current,
+          "y",
+          "px"
+        ) as (value: number) => void;
+      }
+
       // Responsive config (mutable, refreshed on resize)
       let cfg = getArcConfig();
       const onResize = () => {
@@ -199,19 +270,61 @@ export function ScrollSequence() {
 
         const { frameW, frameH, R, cx, cy, visibleRadius, visibleCount } = cfg;
 
-        // -- Update product text --
-        // Use clamped floor so the last frame doesn't overflow FLAVORS array
+        // ------------------------------------------------------------------
+        // Kinetic + product text update on flavor change
+        // ------------------------------------------------------------------
         const flavorIdx = Math.min(
           Math.floor(centerIdx / FRAMES_PER_FLAVOR),
           FLAVORS.length - 1
         );
         if (flavorIdx !== prevFlavorIdxRef.current) {
           prevFlavorIdxRef.current = flavorIdx;
-          setActiveFlavor(FLAVORS[flavorIdx]);
+          const incomingFlavor = FLAVORS[flavorIdx];
+
+          // React state update: triggers AnimatePresence transition
+          setActiveFlavor(incomingFlavor);
           setFlavorKey(flavorIdx);
+
+          // -- Kinetic typography animation --
+          // Update span text to INCOMING product name synchronously
+          if (kineticSpanRef.current) {
+            kineticSpanRef.current.textContent = incomingFlavor.name.toUpperCase();
+            // Update accent color on the span
+            kineticSpanRef.current.style.color = incomingFlavor.accent;
+          }
+
+          if (kineticWrapperRef.current) {
+            // Kill any in-progress tween before starting new one
+            kineticTweenRef.current?.kill();
+
+            // fromTo: start visible at x='0%', glide off-screen left to '-120%'
+            kineticTweenRef.current = gsap.fromTo(
+              kineticWrapperRef.current,
+              { x: "0%" },
+              {
+                x: "-120%",
+                duration: 0.7,
+                ease: "power3.inOut",
+              }
+            );
+          }
         }
 
-        // -- Update each DOM slot --
+        // ------------------------------------------------------------------
+        // Parallax drift — text drifts -20px over the span of one product
+        // ------------------------------------------------------------------
+        // productProgress: 0.0 at first frame of product → 1.0 at last frame
+        const frameWithinProduct = rawIndex % FRAMES_PER_FLAVOR;
+        const productProgress = frameWithinProduct / (FRAMES_PER_FLAVOR - 1);
+
+        if (parallaxSetterRef.current) {
+          // Drift: 0px at start of product → -20px at end
+          parallaxSetterRef.current(productProgress * -20);
+        }
+
+        // ------------------------------------------------------------------
+        // Arc slot update — directly mutates DOM for perf (no React re-render)
+        // ------------------------------------------------------------------
         for (let i = 0; i < MAX_SLOTS; i++) {
           const slot = slotRefs.current[i];
           const img = imgRefs.current[i];
@@ -224,7 +337,6 @@ export function ScrollSequence() {
           }
 
           // Frame index this slot should display
-          // slots 0..visibleCount-1 map to centerIdx-visR .. centerIdx+visR
           const frameIdx = centerIdx - visibleRadius + i;
 
           // Hide out-of-range frames (beginning / end of sequence)
@@ -240,11 +352,9 @@ export function ScrollSequence() {
           }
 
           // Fractional offset of this slot from the continuous rawIndex
-          // offset = 0 → sommet de l'arc; offset > 0 → droite; offset < 0 → gauche
           const offset = i - visibleRadius - frac;
 
           // Arc position (degrees → radians)
-          // -90° = sommet de l'arc (haut), frames entrent par la droite (+offset)
           const angleDeg = -90 + offset * ANGLE_STEP_DEG;
           const angleRad = (angleDeg * Math.PI) / 180;
           const x = cx + R * Math.cos(angleRad);
@@ -255,8 +365,6 @@ export function ScrollSequence() {
           const normalized = Math.min(absOffset / visibleRadius, 1);
           const scale = 1.2 - normalized * 0.5; // 1.2 → 0.7
           const opacity = Math.max(0, 1 - normalized * 0.7); // 1.0 → 0.3
-
-          // Z-index: active frame on top
           const zIndex = Math.round(20 - absOffset * 3);
 
           // Apply transforms directly (bypass React render cycle for perf)
@@ -274,7 +382,7 @@ export function ScrollSequence() {
       updateArc(0);
 
       // -------------------------------------------------------------------
-      // ScrollTrigger wiring
+      // Phase 3 — ScrollTrigger wiring
       // -------------------------------------------------------------------
       const st = ScrollTrigger.create({
         trigger: wrapper,
@@ -287,6 +395,7 @@ export function ScrollSequence() {
       // Cleanup
       return () => {
         st.kill();
+        kineticTweenRef.current?.kill();
         window.removeEventListener("resize", onResize);
       };
     });
@@ -310,6 +419,56 @@ export function ScrollSequence() {
       >
 
         {/* ----------------------------------------------------------------
+            Kinetic typography layer
+            ----------------------------------------------------------------
+            - position: absolute, z-index: 0 — behind arc slots and product text
+            - overflow: hidden — clip the text as it slides out
+            - pointer-events: none — never intercepts interaction
+            - opacity: 0.08 — ultra-subtle watermark effect
+            - GSAP animates kineticWrapperRef (x: '0%' → '-120%') on product change
+        ----------------------------------------------------------------- */}
+        <div
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            inset: 0,
+            overflow: "hidden",
+            pointerEvents: "none",
+            zIndex: 0,
+            display: "flex",
+            alignItems: "center",
+            opacity: 0.08,
+          }}
+        >
+          {/*
+            Inner div animated by GSAP (x transform).
+            whiteSpace: nowrap ensures the text doesn't wrap mid-slide.
+          */}
+          <div
+            ref={kineticWrapperRef}
+            style={{ whiteSpace: "nowrap", willChange: "transform" }}
+          >
+            <span
+              ref={kineticSpanRef}
+              style={{
+                fontFamily: "'PP Neue Corp Wide', sans-serif",
+                fontWeight: 800,
+                fontSize: "clamp(6rem, 30vw, 40vw)",
+                textTransform: "uppercase",
+                letterSpacing: "-0.02em",
+                lineHeight: 1,
+                /* Initial color matches first flavor; updated per transition */
+                color: FLAVORS[0].accent,
+                display: "inline-block",
+                userSelect: "none",
+              }}
+            >
+              {/* Text content set synchronously via ref in updateArc — starts empty */}
+            </span>
+          </div>
+        </div>
+
+        {/* ----------------------------------------------------------------
             Arc frame slots — absolutely positioned, updated via direct DOM
         ----------------------------------------------------------------- */}
         <div
@@ -325,7 +484,6 @@ export function ScrollSequence() {
               }}
               className="absolute"
               style={{
-                /* Initial size; overridden per-tick for responsive */
                 width: "280px",
                 height: "400px",
                 willChange: "transform, opacity",
@@ -333,7 +491,6 @@ export function ScrollSequence() {
                 opacity: 0,
               }}
             >
-              {/* Frame image — mix-blend-mode: screen removes dark background */}
               <img
                 ref={(el) => {
                   imgRefs.current[i] = el;
@@ -354,9 +511,16 @@ export function ScrollSequence() {
         </div>
 
         {/* ----------------------------------------------------------------
-            Product text — left side, animated on flavor change
+            Product text — left side
+            ----------------------------------------------------------------
+            parallaxTextRef: outer wrapper, GSAP applies y drift (0 → -20px)
+            per product scroll progress — no Framer Motion here to avoid
+            transform conflicts.
+
+            AnimatePresence lives inside: handles enter/exit opacity+x.
         ----------------------------------------------------------------- */}
         <div
+          ref={parallaxTextRef}
           className="absolute z-20"
           style={{
             left: "clamp(1.5rem, 4vw, 5rem)",
@@ -364,6 +528,8 @@ export function ScrollSequence() {
             transform: "translateY(-50%)",
             maxWidth: "32vw",
             pointerEvents: "none",
+            /* willChange ensures GPU compositing for smooth parallax */
+            willChange: "transform",
           }}
         >
           {/*
