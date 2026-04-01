@@ -62,17 +62,21 @@ export function Navbar() {
         <Link
           href="/"
           style={{
-            fontFamily: "'PP Neue Corp Wide', sans-serif",
-            fontWeight: 800,
-            fontSize: "0.85rem",
-            color: "#fff",
-            letterSpacing: "0.08em",
+            display: "flex",
+            alignItems: "center",
             textDecoration: "none",
             marginRight: "1.2rem",
-            whiteSpace: "nowrap",
           }}
         >
-          AXION
+          <img
+            src="/images/products/AXION.PNG"
+            alt="AXION"
+            style={{
+              height: "28px",
+              width: "auto",
+              objectFit: "contain",
+            }}
+          />
         </Link>
 
         {/* Desktop nav items — center of pill */}
@@ -178,18 +182,14 @@ export function Navbar() {
         >
           <Link
             href="/"
-            style={{
-              fontFamily: "'PP Neue Corp Wide', sans-serif",
-              fontWeight: 800,
-              fontSize: "1.3rem",
-              letterSpacing: "0.12em",
-              color: "rgba(255,255,255,0.8)",
-              textDecoration: "none",
-              marginBottom: "1rem",
-            }}
+            style={{ textDecoration: "none", marginBottom: "1.5rem" }}
             onClick={() => setMenuOpen(false)}
           >
-            AXION
+            <img
+              src="/images/products/AXION.PNG"
+              alt="AXION"
+              style={{ height: "36px", width: "auto", objectFit: "contain" }}
+            />
           </Link>
           {NAV_ITEMS.map((item) => (
             <Link

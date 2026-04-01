@@ -27,7 +27,7 @@ export default function ShopPage() {
   const isTransitioning = useRef(false);
 
   const activeProduct = PRODUCTS[currentIndex];
-  const accentColor = activeProduct.accent;
+  const accentColor = "#fff"; // Couleur unique, pas de changement par produit
 
   // Navigation
   const goTo = useCallback(
@@ -232,15 +232,15 @@ export default function ShopPage() {
       <div style={{ textAlign: "center", padding: "0 2rem 1.5rem", position: "relative", zIndex: 20 }}>
         <p style={{
           fontFamily: "'PP Neue Corp Wide', sans-serif", fontWeight: 800,
-          fontSize: "clamp(2rem, 4vw, 3rem)", color: accentColor,
-          margin: "0 0 0.3rem", transition: "color 500ms ease",
+          fontSize: "clamp(2rem, 4vw, 3rem)", color: "#fff",
+          margin: "0 0 0.3rem",
         }}>
           {activeProduct.name}
         </p>
         <p style={{
           fontFamily: "'DM Sans', sans-serif", fontWeight: 300, fontStyle: "italic",
-          fontSize: "0.95rem", color: `${accentColor}80`,
-          margin: "0 0 1.2rem", transition: "color 500ms ease",
+          fontSize: "0.95rem", color: "rgba(255,255,255,0.45)",
+          margin: "0 0 1.2rem",
         }}>
           {activeProduct.tagline}
         </p>
@@ -258,8 +258,7 @@ export default function ShopPage() {
               fontFamily: "'DM Sans', sans-serif", fontWeight: 500,
               fontSize: "0.75rem", letterSpacing: "0.2em", textTransform: "uppercase",
               textDecoration: "none", padding: "0.8rem 2rem",
-              background: accentColor, color: "#000",
-              transition: "background 500ms ease",
+              background: "#fff", color: "#000",
             }}
           >
             Explore
@@ -281,7 +280,7 @@ export default function ShopPage() {
               height: "8px",
               borderRadius: "999px",
               border: "none",
-              background: i === currentIndex ? p.accent : "rgba(255,255,255,0.15)",
+              background: i === currentIndex ? "#fff" : "rgba(255,255,255,0.2)",
               cursor: "pointer",
               transition: "all 400ms cubic-bezier(0.16,1,0.3,1)",
               padding: 0,
