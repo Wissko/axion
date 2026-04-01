@@ -663,10 +663,11 @@ function CTAButton({
         fontSize: "0.85rem",
         letterSpacing: "0.2em",
         textTransform: "uppercase",
-        padding: "1.1rem 2.8rem",
-        border: "none",
-        background: "#fff",
-        color: "#000",
+        padding: "1rem 2.5rem",
+        border: "1px solid rgba(255,255,255,0.3)",
+        borderRadius: "999px",
+        background: "transparent",
+        color: "#fff",
         cursor: "pointer",
         outline: "none",
         textDecoration: "none",
@@ -676,8 +677,10 @@ function CTAButton({
         position: "relative",
         overflow: "hidden",
         transition: "transform 300ms cubic-bezier(0.16,1,0.3,1), box-shadow 300ms ease",
-        transform: hovered ? "scale(1.04)" : "scale(1)",
-        boxShadow: hovered ? "0 0 30px rgba(255,255,255,0.15)" : "none",
+        transform: hovered ? "scale(1.03)" : "scale(1)",
+        boxShadow: hovered ? "0 0 20px rgba(255,255,255,0.08)" : "none",
+        backdropFilter: "blur(8px)",
+        WebkitBackdropFilter: "blur(8px)",
       }}
     >
       {label}
