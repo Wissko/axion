@@ -23,7 +23,7 @@ const INGREDIENTS = [
 
 export default function SciencePage() {
   return (
-    <main style={{ background: "#050505", minHeight: "100vh", paddingTop: "8rem", paddingBottom: "4rem" }}>
+    <main style={{ background: "#050505", minHeight: "100vh", paddingTop: "8rem", paddingBottom: "4rem", overflowX: "hidden" }}>
       {/* Hero */}
       <section style={{ textAlign: "center", padding: "0 2rem", marginBottom: "5rem" }}>
         <p style={{
@@ -51,7 +51,7 @@ export default function SciencePage() {
       {/* Ingredients grid */}
       <section style={{
         maxWidth: "900px", margin: "0 auto", padding: "0 2rem",
-        display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(350px, 1fr))", gap: "2.5rem",
+        display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(350px, 100%), 1fr))", gap: "2.5rem",
       }}>
         {INGREDIENTS.map((ing) => (
           <div key={ing.name} style={{ borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: "1.5rem" }}>

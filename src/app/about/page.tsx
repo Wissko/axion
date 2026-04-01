@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 
 export default function AboutPage() {
   return (
-    <main style={{ background: "#050505", minHeight: "100vh", paddingTop: "8rem", paddingBottom: "4rem" }}>
+    <main style={{ background: "#050505", minHeight: "100vh", paddingTop: "8rem", paddingBottom: "4rem", overflowX: "hidden" }}>
       <section style={{ maxWidth: "680px", margin: "0 auto", padding: "0 2rem" }}>
         <p style={{
           fontFamily: "'DM Sans', sans-serif", fontWeight: 300, fontSize: "0.7rem",

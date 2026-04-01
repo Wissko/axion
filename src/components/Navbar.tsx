@@ -219,6 +219,7 @@ export function Navbar() {
           .axion-nav-desktop { display: none !important; }
           .axion-nav-cta { display: none !important; }
           .axion-nav-hamburger { display: flex !important; }
+          nav { padding: 0.5rem 1rem 0.5rem 1rem !important; }
         }
       `}</style>
     </>

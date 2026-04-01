@@ -100,7 +100,8 @@ export default function ContactPage() {
               padding: "1rem 2rem", border: "1px solid rgba(255,255,255,0.3)",
               background: "transparent", color: "rgba(255,255,255,0.7)",
               cursor: "pointer", transition: "all 400ms ease",
-              alignSelf: "flex-start",
+              alignSelf: "stretch",
+              minHeight: "48px",
             }}
           >
             Send Message

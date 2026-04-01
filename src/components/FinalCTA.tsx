@@ -138,6 +138,8 @@ export function FinalCTA() {
           transition={{ duration: 0.7, delay: 1.1, ease: EASE_LUXURY }}
           style={{
             display: "flex",
+            flexWrap: "wrap",
+            justifyContent: "center",
             alignItems: "center",
             gap: "0.75rem",
           }}

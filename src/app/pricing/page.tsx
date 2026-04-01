@@ -56,7 +56,7 @@ export default function PricingPage() {
 
       <section style={{
         maxWidth: "1000px", margin: "0 auto", padding: "0 2rem",
-        display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1.5rem",
+        display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(280px, 100%), 1fr))", gap: "1.5rem",
         alignItems: "start",
       }}>
         {PLANS.map((plan) => (

@@ -179,6 +179,14 @@ export function ScrollSequence() {
             top: 1rem !important;
             right: 1rem !important;
           }
+          .axion-product-section {
+            height: auto !important;
+            min-height: 100vh !important;
+            overflow: hidden !important;
+          }
+          .axion-image-col canvas {
+            max-height: 38vh !important;
+          }
         }
       `}</style>
     </div>

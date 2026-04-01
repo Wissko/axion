@@ -569,9 +569,12 @@ export default function ProductPage() {
       <style>{`
         @media (max-width: 768px) {
           .pdp-hero { flex-direction: column !important; height: auto !important; min-height: 100vh; }
-          .pdp-hero-img { width: 100% !important; height: 45vh !important; }
-          .pdp-hero-text { width: 100% !important; padding: 2rem !important; text-align: center; align-items: center; }
+          .pdp-hero-img { width: 100% !important; height: 40vh !important; min-height: 280px !important; }
+          .pdp-hero-text { width: 100% !important; padding: 1.5rem !important; text-align: center; align-items: center; }
+          .pdp-hero-text h1 { font-size: clamp(2.5rem, 10vw, 4rem) !important; }
+          .pdp-hero-text button { width: 100% !important; min-height: 48px; }
           .pdp-stats { grid-template-columns: 1fr !important; gap: 2rem !important; }
+          .pdp-hero-img img { max-width: 240px !important; max-height: 35vh !important; }
         }
       `}</style>
     </main>

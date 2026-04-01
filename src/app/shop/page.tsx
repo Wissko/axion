@@ -215,6 +215,7 @@ export default function ShopPage() {
                   src={PRODUCT_IMAGES[product.slug]}
                   alt={product.name}
                   draggable={false}
+                  className="shop-carousel-img"
                   style={{
                     width: "320px",
                     height: "440px",
@@ -289,6 +290,15 @@ export default function ShopPage() {
           />
         ))}
       </div>
+      {/* Mobile styles */}
+      <style>{`
+        @media (max-width: 768px) {
+          .shop-carousel-img {
+            width: 200px !important;
+            height: 300px !important;
+          }
+        }
+      `}</style>
     </main>
   );
 }
