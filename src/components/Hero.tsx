@@ -119,18 +119,17 @@ export function Hero() {
         }}
         className="absolute inset-0 will-change-transform flex flex-col items-center justify-center gap-4 z-10"
       >
-        <h1
-          className="uppercase text-center leading-none tracking-tight select-none"
+        <img
+          src="/images/products/AXION.PNG"
+          alt="AXION"
+          className="select-none"
           style={{
-            fontFamily: "PP Neue Corp Wide, sans-serif",
-            fontWeight: 800,
-            fontSize: "clamp(4rem, 11vw, 14rem)",
-            color: "#F5F0E6",
-            textShadow: "0 0 80px rgba(240,168,48,0.35)",
+            width: "clamp(200px, 40vw, 500px)",
+            height: "auto",
+            objectFit: "contain",
+            filter: "drop-shadow(0 0 80px rgba(240,168,48,0.35))",
           }}
-        >
-          AXION
-        </h1>
+        />
         <p
           className="tracking-widest uppercase"
           style={{
