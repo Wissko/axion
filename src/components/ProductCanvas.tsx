@@ -92,13 +92,11 @@ export function ProductCanvas({
 }: ProductCanvasProps) {
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-      {/* Spinner affiché via CSS tant que le canvas n'est pas prêt
-          — sera masqué par le canvas une fois monté */}
-      <SpinnerFallback accentColor={accentColor} />
+      {/* Spinner supprimé — le canvas couvre tout dès le mount */}
 
       <Canvas
         camera={{ position: [0, 0, 5], fov: 35 }}
-        style={{ background: 'transparent', position: 'relative', zIndex: 1 }}
+        style={{ background: 'transparent', position: 'relative', zIndex: 2 }}
         gl={{ alpha: true, antialias: true }}
       >
         <Suspense fallback={null}>
