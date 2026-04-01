@@ -9,7 +9,7 @@
  * Chaque produit vit comme une page de magazine de luxe.
  */
 
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect, useCallback } from "react";
 import { motion, useInView } from "framer-motion";
 import dynamic from "next/dynamic";
 
@@ -250,6 +250,9 @@ function ProductSection({ product }: { product: ProductData }) {
         overflow: "hidden",
       }}
     >
+      {/* ── Éclairs aléatoires drama ──────────────────── */}
+      <LightningOverlay accent={product.accent} />
+
       {/* ── Numéro de section — top-right ─────────────── */}
       <div
         className="axion-section-number"
@@ -474,6 +477,137 @@ function ProductSection({ product }: { product: ProductData }) {
         </div>
       </div>
     </section>
+  );
+}
+
+// ──────────────────────────────────────────────────────
+// LIGHTNING EFFECT — éclairs aléatoires drama
+// ──────────────────────────────────────────────────────
+
+function LightningOverlay({ accent }: { accent: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  /** Génère un path SVG zigzag aléatoire (éclair) */
+  const generateBoltPath = useCallback(() => {
+    const segments = 5 + Math.floor(Math.random() * 3); // 5-7 segments
+    let x = 50;
+    let y = 0;
+    let d = `M ${x} ${y}`;
+    for (let i = 0; i < segments; i++) {
+      x += (Math.random() - 0.5) * 60;
+      y += 100 / segments + Math.random() * 20;
+      x = Math.max(10, Math.min(90, x));
+      d += ` L ${x} ${y}`;
+    }
+    return d;
+  }, []);
+
+  /** Déclenche un flash d'éclair */
+  const triggerFlash = useCallback(() => {
+    if (!containerRef.current) return;
+
+    // Créer le SVG éclair
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 100 300");
+    svg.setAttribute("preserveAspectRatio", "none");
+    const w = 60 + Math.random() * 100; // 60-160px
+    const h = 150 + Math.random() * 200; // 150-350px
+    const left = Math.random() * 80 + 10; // 10-90%
+    const top = Math.random() * 60; // 0-60%
+    const rotation = (Math.random() - 0.5) * 120; // -60 à 60 degrés
+
+    Object.assign(svg.style, {
+      position: "absolute",
+      left: `${left}%`,
+      top: `${top}%`,
+      width: `${w}px`,
+      height: `${h}px`,
+      transform: `rotate(${rotation}deg)`,
+      opacity: "0",
+      pointerEvents: "none",
+      filter: `drop-shadow(0 0 15px ${accent}) drop-shadow(0 0 30px ${accent})`,
+      zIndex: "5",
+    });
+
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", generateBoltPath());
+    path.setAttribute("stroke", accent);
+    path.setAttribute("stroke-width", "2.5");
+    path.setAttribute("fill", "none");
+    path.setAttribute("stroke-linecap", "round");
+    svg.appendChild(path);
+    containerRef.current.appendChild(svg);
+
+    // Flash global subtil
+    const flash = document.createElement("div");
+    Object.assign(flash.style, {
+      position: "absolute",
+      inset: "0",
+      background: accent,
+      opacity: "0",
+      pointerEvents: "none",
+      zIndex: "4",
+    });
+    containerRef.current.appendChild(flash);
+
+    // Animation — brutal et rapide
+    // Éclair : 0 → 0.9 → 0 en 150ms
+    svg.animate(
+      [
+        { opacity: 0 },
+        { opacity: 0.9, offset: 0.3 },
+        { opacity: 0.6, offset: 0.5 },
+        { opacity: 0.9, offset: 0.7 },
+        { opacity: 0 },
+      ],
+      { duration: 150, easing: "ease-out" }
+    );
+
+    // Flash global : 0 → 0.04 → 0 en 200ms
+    flash.animate(
+      [{ opacity: 0 }, { opacity: 0.04, offset: 0.4 }, { opacity: 0 }],
+      { duration: 200, easing: "ease-out" }
+    );
+
+    // Cleanup
+    setTimeout(() => {
+      svg.remove();
+      flash.remove();
+    }, 250);
+  }, [accent, generateBoltPath]);
+
+  useEffect(() => {
+    const scheduleNext = () => {
+      const delay = 2000 + Math.random() * 2000; // 2-4s
+      intervalRef.current = setTimeout(() => {
+        triggerFlash();
+        // Double flash 30% du temps (multi-éclairs)
+        if (Math.random() < 0.3) {
+          setTimeout(triggerFlash, 80);
+        }
+        scheduleNext();
+      }, delay) as unknown as ReturnType<typeof setInterval>;
+    };
+
+    scheduleNext();
+
+    return () => {
+      if (intervalRef.current) clearTimeout(intervalRef.current as unknown as number);
+    };
+  }, [triggerFlash]);
+
+  return (
+    <div
+      ref={containerRef}
+      style={{
+        position: "absolute",
+        inset: 0,
+        pointerEvents: "none",
+        zIndex: 3,
+        overflow: "hidden",
+      }}
+    />
   );
 }
 
