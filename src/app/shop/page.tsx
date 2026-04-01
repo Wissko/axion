@@ -113,7 +113,7 @@ export default function ShopPage() {
   };
 
   const activeProduct = PRODUCTS[activeIndex];
-  const bgColor = activeProduct?.background || "#050505";
+  const bgColor = "#000000";
   const accentColor = activeProduct?.accent || "#fff";
 
   return (
