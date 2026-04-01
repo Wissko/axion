@@ -75,8 +75,8 @@ function Model({ path, accentColor }: { path: string; accentColor: string }) {
   })
 
   return (
-    <group ref={groupRef} rotation={[0, 0, Math.PI / 6]}>
-      <primitive object={scene} scale={1.5} position={[0, -0.35, 0]} />
+    <group ref={groupRef} rotation={[0, 0, Math.PI / 4.5]}>
+      <primitive object={scene} scale={1.5} position={[0, -0.7, 0]} />
     </group>
   )
 }
