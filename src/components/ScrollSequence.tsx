@@ -12,6 +12,7 @@
 import React, { useRef, useState, useEffect, useCallback } from "react";
 import { motion, useInView } from "framer-motion";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 /* GSAP removed — transitions handled by Framer Motion + CSS for performance */
 
 // ProductCanvas est chargé côté client uniquement — R3F Canvas ne tourne pas en SSR
@@ -485,7 +486,7 @@ function ProductSection({ product }: { product: ProductData }) {
 
             {/* CTA */}
             <motion.div variants={textLineVariants}>
-              <CTAButton accent={product.accent} background={product.background} label={product.cta} />
+              <CTAButton accent={product.accent} background={product.background} label={product.cta} href={`/shop/${product.id}`} />
             </motion.div>
           </motion.div>
         </div>
@@ -633,15 +634,18 @@ function CTAButton({
   accent,
   background,
   label,
+  href,
 }: {
   accent: string;
   background: string;
   label: string;
+  href: string;
 }) {
   const [hovered, setHovered] = useState(false);
 
   return (
-    <button
+    <Link
+      href={href}
       className="axion-cta"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -654,14 +658,15 @@ function CTAButton({
         padding: "0.75rem 2rem",
         border: `1px solid ${accent}`,
         backgroundColor: hovered ? accent : "transparent",
-        /* Texte : accent par défaut, fond produit au hover */
         color: hovered ? background : accent,
         transition: "background-color 400ms ease, color 400ms ease",
         cursor: "pointer",
         outline: "none",
+        textDecoration: "none",
+        display: "inline-block",
       }}
     >
       {label}
-    </button>
+    </Link>
   );
 }
