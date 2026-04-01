@@ -90,7 +90,8 @@ export default function ShopPage() {
     };
 
     const clamped = Math.max(-2, Math.min(2, offset));
-    const cfg = configs[clamped.toString() as keyof typeof configs] || configs["0"];
+    const key = String(clamped) as unknown as keyof typeof configs;
+    const cfg = configs[key] || configs["0"];
 
     return {
       position: "absolute" as const,
