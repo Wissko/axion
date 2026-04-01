@@ -424,10 +424,11 @@ function ProductSection({ product }: { product: ProductData }) {
                 fontFamily: "'PP Neue Corp Wide', sans-serif",
                 fontWeight: 800,
                 fontSize: "clamp(3rem, 6vw, 5.5rem)",
-                color: "#fff",
+                color: "#ffffff",
                 margin: "0 0 0.5rem",
                 lineHeight: 1,
                 letterSpacing: "-0.01em",
+                textShadow: "0 0 40px rgba(255,255,255,0.08)",
               }}
             >
               {product.name}
