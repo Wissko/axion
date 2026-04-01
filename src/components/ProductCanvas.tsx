@@ -76,7 +76,7 @@ function Model({ path, accentColor }: { path: string; accentColor: string }) {
 
   return (
     <group ref={groupRef} rotation={[0, 0, Math.PI / 6]}>
-      <primitive object={scene} scale={1.0} />
+      <primitive object={scene} scale={0.35} />
     </group>
   )
 }
@@ -97,7 +97,7 @@ export function ProductCanvas({
       <SpinnerFallback accentColor={accentColor} />
 
       <Canvas
-        camera={{ position: [0, 0, 4], fov: 40 }}
+        camera={{ position: [0, 0, 5], fov: 35 }}
         style={{ background: 'transparent', position: 'relative', zIndex: 1 }}
         gl={{ alpha: true, antialias: true }}
       >
