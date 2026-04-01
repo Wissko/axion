@@ -257,8 +257,13 @@ export default function ShopPage() {
             style={{
               fontFamily: "'DM Sans', sans-serif", fontWeight: 500,
               fontSize: "0.75rem", letterSpacing: "0.2em", textTransform: "uppercase",
-              textDecoration: "none", padding: "0.8rem 2rem",
-              background: "#fff", color: "#000",
+              textDecoration: "none", padding: "0.9rem 2.2rem",
+              background: "transparent", color: "#fff",
+              border: "1px solid rgba(255,255,255,0.3)",
+              borderRadius: "999px",
+              backdropFilter: "blur(8px)",
+              WebkitBackdropFilter: "blur(8px)",
+              transition: "transform 300ms cubic-bezier(0.16,1,0.3,1), box-shadow 300ms ease",
             }}
           >
             Explore
